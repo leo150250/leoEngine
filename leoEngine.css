@@ -1,0 +1,32 @@
+body {
+	margin: 0px;
+	background-color: #141428;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+canvas {
+	box-shadow: 2px 2px 10px #000F;
+}
+dialog {
+	background-color: #101d42aa;
+	color: #FFF;
+	border: 1px solid #6f83c4;
+	font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+	padding: 0px;
+	overflow: hidden;
+	border-radius: none;
+	-webkit-backdrop-filter: blur(50px);
+	backdrop-filter: blur(50px);
+}
+dialog h1 {
+	margin: 0px;
+	padding: 1rem;
+	border-bottom: 2px groove #5262cf;
+}
+dialog pre {
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	margin: 0px;
+	padding: 1rem;
+}
