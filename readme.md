@@ -1,8 +1,8 @@
-# 16GamesJS
+# LeoEngine
 
-Este projeto apresenta o **LeoWebEngine**, um mini-motor gráfico para jogos 2D em JavaScript. O objetivo é fornecer uma base simples e eficiente para a criação de jogos clássicos, com foco em renderização, lógica e manipulação de recursos gráficos, baseando-se no workflow de programação do GameMakerStudio.
+Este projeto apresenta o **LeoEngine**, um mini-motor gráfico para jogos 2D em JavaScript. O objetivo é fornecer uma base simples e eficiente para a criação de jogos clássicos, com foco em renderização, lógica e manipulação de recursos gráficos, baseando-se no workflow de programação do GameMakerStudio.
 
-## Sobre o LeoWebEngine
+## Sobre o LeoEngine
 
 O arquivo principal, `leoEngine.js`, implementa funcionalidades essenciais para desenvolvimento de jogos:
 
