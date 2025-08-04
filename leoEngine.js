@@ -2,6 +2,36 @@
 var canvas = Element;
 var ctx = CanvasRenderingContext2D;
 console.log("START LeoWebEngine 0.0.0.1");
+const C = {
+	WHITE: "#FFFFFF",
+	RED: "#FF0000",
+	GREEN: "#00FF00",
+	BLUE: "#0000FF",
+	YELLOW: "#FFFF00",
+	BLACK: "#000000",
+	GRAY: "#808080",
+	GREY: "#808080",
+	SILVER: "#C0C0C0",
+	MAROON: "#800000",
+	OLIVE: "#808000",
+	LIME: "#00FF00",
+	AQUA: "#00FFFF",
+	TEAL: "#008080",
+	NAVY: "#000080",
+	FUCHSIA: "#FF00FF",
+	PURPLE: "#800080",
+	ORANGE: "#FFA500",
+	BROWN: "#A52A2A"
+};
+const AL = {
+	LEFT: "left",
+	CENTER: "center",
+	RIGHT: "right",
+	TOP: "top",
+	MIDDLE: "middle",
+	BOTTOM: "bottom",
+	NONE: "none"
+}
 
 //Classes
 class Loader {
@@ -73,15 +103,29 @@ class Texture extends Resource {
 		super();
 
 		this.img = document.createElement("img");
-		this.img.addEventListener("load",(e)=>{
-			super.ok();
-		})
-		this.img.src = argImg;
 		this.img.style.display = "none";
 		document.body.appendChild(this.img);
 		
+		this._onLoadCallbacks = [];
+		
+		this.img.addEventListener("load",(e)=>{
+			super.ok();
+			for (let cb of this._onLoadCallbacks) {
+				cb(this);
+			}
+		})
+		this.img.src = argImg;
+		
 		textures.push(this);
 		console.log("TEX "+argImg);
+	}
+	
+	onLoad(cb) {
+		if (this.img.complete && this.img.naturalWidth > 0) {
+			cb(this);
+		} else {
+			this._onLoadCallbacks.push(cb);
+		}
 	}
 }
 var sprites = [];
@@ -93,13 +137,24 @@ class Sprite extends Resource {
 		this.pos = argPos;
 		this.w = argW;
 		this.h = argH;
+		this.xOrigin = 0;
+		this.yOrigin = 0;
+		this._vxOrigin = AL.LEFT;
+		this._vyOrigin = AL.TOP;
+
 		if (typeof argImg == "string") {
 			let newTex = new Texture(argImg);
-			argImg = newTex;
-			newTex.img.onload = ()=>{ this.definirTex(argImg,argPos,argW,argH); }
+			newTex.onLoad((tex) => {
+				this.setTex(tex,argPos,argW,argH);
+			});
+			this.tex = newTex;
+		} else if (argImg instanceof Texture) {
+			argImg.onLoad((tex) => {
+				this.setTex(tex, argPos, argW, argH);
+			});
+			this.tex = argImg;
 		} else {
-
-			this.definirTex(argImg,argPos,argW,argH);
+			this.setTex(argImg,argPos,argW,argH);
 		}
 
 		sprites.push(this);
@@ -116,7 +171,7 @@ class Sprite extends Resource {
 	get img() { return this.tex.img; }
 	set img(value) { this.tex.img = value; }
 	
-	definirTex(argTex,argPos,argW,argH) {
+	setTex(argTex,argPos,argW,argH) {
 		this.tex = argTex;
 		this.pos = argPos;
 		this.w = argW;
@@ -127,7 +182,36 @@ class Sprite extends Resource {
 		if (this.h == -1) {
 			this.h = this.img.height;
 		}
+		this.setOrigin(this._vxOrigin,this._vyOrigin);
 		console.log("SPR "+this.img.src);
+	}
+	setOrigin(argX,argY) {
+		if (typeof argX == "number") {
+			this.xOrigin = argX;
+			this._vxOrigin = AL.NONE;
+		} else {
+			this._vxOrigin = argX;
+			switch (this._vxOrigin) {
+				case AL.LEFT: this.xOrigin = 0; break;
+				case AL.CENTER: this.xOrigin = this.w / 2; break;
+				case AL.RIGHT: this.xOrigin = this.w; break;
+				case AL.NONE: break;
+				default: throw new Error("Invalid horizontal alignment value!");
+			}
+		}
+		if (typeof argY == "number") {
+			this.yOrigin = argY;
+			this._vyOrigin = AL.NONE;
+		} else {
+			this._vyOrigin = argY;
+			switch (this._vyOrigin) {
+				case AL.TOP: this.yOrigin = 0; break;
+				case AL.MIDDLE: this.yOrigin = this.h / 2; break;
+				case AL.BOTTOM: this.yOrigin = this.h; break;
+				case AL.NONE: break;
+				default: throw new Error("Invalid vertical alignment value!");
+			}
+		}
 	}
 }
 
@@ -144,9 +228,14 @@ class Instance extends Resource {
 		this.pos = argPos;
 		this.hspeed = 0;
 		this.vspeed = 0;
+		this.imageXScale = 1;
+		this.imageYScale = 1;
+		this.imageAngle = 0;
+		this.imageBlend = C.WHITE;
+		this.imageAlpha = 1;
 		this.alarm = Array.from({length:12}, () => -1);
 		this.alarmFunc = Array.from({length:12}, () => new Alarm(this));
-		this.selfDraw = true;
+		this.visible = true;
 
 		console.log("INST "+instances.length);
 		instances.push(this);
@@ -176,9 +265,13 @@ class Instance extends Resource {
 		}
 	}
 	draw() {
-		if (this.selfDraw) {
-			drawSprite(this.sprite,this.x,this.y);
-		}
+		//drawSprite(this.sprite,this.x,this.y);
+		drawSpriteExt(
+			this.sprite,
+			this.x, this.y,
+			this.imageXScale, this.imageYScale,
+			this.imageAngle, this.imageBlend, this.imageAlpha); // Função padrão de draw, para a instância desenhar a própria imagem com suas variáveis reservadas
+		// Para mudar este comportamento, basta gravar uma nova função em draw.
 	}
 }
 
@@ -227,21 +320,13 @@ class RenderWindow {
 					}
 					this.draw();
 					for (let instance of instances) {
-						instance.draw();
+						if (instance.visible) { // Chama o evento draw() das instâncias automaticamente somente se elas estiverem marcadas como visível (padrão)
+							instance.draw();
+						}
 					}
 				} catch (error) {
 					clearInterval(this.update);
-					console.error(error);
-					let showError = document.createElement("dialog");
-					showError.classList.add("error");
-					let titleError = document.createElement("h1");
-					titleError.innerHTML = error.message;
-					let stackError = document.createElement("pre");
-					stackError.innerHTML = error.stack;
-					showError.appendChild(titleError);
-					showError.appendChild(stackError);
-					document.body.appendChild(showError);
-					showError.showModal();
+					showError(error);
 				}
 			}
 		},1000 / argFrameRate);
@@ -259,9 +344,61 @@ function drawSprite(argSprite,argX,argY) {
 	ctx.drawImage(
 		argSprite.img,
 		argSprite.x, argSprite.y, argSprite.w, argSprite.h,
-		argX, argY, argSprite.w, argSprite.h
+		argX - argSprite.xOrigin, argY - argSprite.yOrigin, argSprite.w, argSprite.h
 	);
 };
+/**
+ * Desenha uma sprite com parâmetros estendidos (escala, rotação, blend, alpha).
+ * @param {Sprite} argSprite - Sprite a ser desenhada.
+ * @param {number} argX - Posição X na tela.
+ * @param {number} argY - Posição Y na tela.
+ * @param {number} argScaleX - Escala horizontal.
+ * @param {number} argScaleY - Escala vertical.
+ * @param {number} argRot - Rotação em graus.
+ * @param {string} argBlend - Cor de blend (hex).
+ * @param {number} argAlpha - Transparência (0-1).
+ */
+function drawSpriteExt(argSprite, argX, argY, argScaleX = 1, argScaleY = 1, argRot = 0, argBlend = C.WHITE, argAlpha = 1) {
+    ctx.save();
+    ctx.translate(argX, argY);
+    ctx.rotate(argRot);
+    ctx.scale(argScaleX, argScaleY);
+    ctx.globalAlpha = argAlpha;
+
+    if (argBlend && argBlend !== C.WHITE) {
+        // Canvas auxiliar
+        let tempCanvas = document.createElement("canvas");
+        tempCanvas.width = argSprite.w;
+        tempCanvas.height = argSprite.h;
+        let tempCtx = tempCanvas.getContext("2d");
+
+        // Desenha a imagem
+        tempCtx.drawImage(
+            argSprite.img,
+            argSprite.x, argSprite.y, argSprite.w, argSprite.h,
+            0, 0, argSprite.w, argSprite.h
+        );
+
+        // Aplica o blend apenas nos pixels da imagem
+        tempCtx.globalCompositeOperation = "multiply";
+        tempCtx.fillStyle = argBlend;
+        tempCtx.fillRect(0, 0, argSprite.w, argSprite.h);
+
+        // Volta ao modo normal e desenha no contexto principal
+        ctx.drawImage(
+            tempCanvas,
+            -argSprite.xOrigin, -argSprite.yOrigin, argSprite.w, argSprite.h
+        );
+    } else {
+        ctx.drawImage(
+            argSprite.img,
+            argSprite.x, argSprite.y, argSprite.w, argSprite.h,
+            argSprite.x-argSprite.xOrigin, argSprite.y-argSprite.yOrigin, argSprite.w, argSprite.h
+        );
+    }
+
+    ctx.restore();
+}
 function drawLine(argPos1,argPos2) {
 	ctx.beginPath();
 	ctx.moveTo(argPos1.x,argPos1.y);
@@ -276,14 +413,6 @@ function showWindow(argWindow) {
 	//Registro global
 	canvas = argWindow.canvas;
 	ctx = argWindow.ctx;
-
-	//Registro de eventos de teclado
-	canvas.addEventListener("keydown",(e)=>{
-		keys[e.code] = true;
-	});
-	canvas.addEventListener("keyup",(e)=>{
-		keys[e.code] = false;
-	});
 
 	//Registro de eventos de mouse
 	canvas.addEventListener("mousedown",(e)=>{
@@ -301,9 +430,32 @@ function showWindow(argWindow) {
 		m.y = e.offsetY;
 	})
 }
+/**
+ * Exibe o diálogo de erro.
+ * @param {Error} argError O erro throwable. A função exibirá na console e exibirá na janela como um modal.
+ */
+function showError(argError) {
+	console.error(argError);
+	let dialogError = document.createElement("dialog");
+	dialogError.classList.add("error");
+	let titleError = document.createElement("h1");
+	titleError.innerHTML = argError.message;
+	let stackError = document.createElement("pre");
+	stackError.innerHTML = argError.stack;
+	dialogError.appendChild(titleError);
+	dialogError.appendChild(stackError);
+	document.body.appendChild(dialogError);
+	dialogError.showModal();
+}
 
 //Funções de teclado
 var keys = new Object();
+const VK = {
+	LEFT: "ArrowLeft",
+	RIGHT: "ArrowRight",
+	UP: "ArrowUp",
+	DOWN: "ArrowDown"
+}
 function keyboardCheck(argKey) {
 	if (!(argKey in keys)) {
 		keys[argKey] = false;
@@ -311,6 +463,13 @@ function keyboardCheck(argKey) {
 	}
 	return keys[argKey];
 }
+//Registro de eventos de teclado
+window.addEventListener("keydown",(e)=>{
+	keys[e.code] = true;
+});
+window.addEventListener("keyup",(e)=>{
+	keys[e.code] = false;
+});
 
 //Funções de mouse
 var mButtons = new Object();
