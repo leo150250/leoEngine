@@ -98,7 +98,8 @@ class Sprite extends Resource {
 			argImg = newTex;
 			newTex.img.onload = ()=>{ this.definirTex(argImg,argPos,argW,argH); }
 		} else {
-			this.definirTex(argImg);
+
+			this.definirTex(argImg,argPos,argW,argH);
 		}
 
 		sprites.push(this);
@@ -279,13 +280,43 @@ function keyboardCheck(argKey) {
 	}
 	return keys[argKey];
 }
-var keys=new Object();
+function mouseCheckPos(argButton,argPos1,argPos2) {
+	if (!(argButton in mButtons)) {
+		mButtons[argButton] = {
+			press: false,
+			pos: new Vec2(-1,-1)
+		};
+		console.log("MBUTTON "+argButton);
+	}
+	let btn = mButtons[argButton];
+	let minX = Math.min(argPos1.x, argPos2.x);
+	let maxX = Math.max(argPos1.x, argPos2.x);
+	let minY = Math.min(argPos1.y, argPos2.y);
+	let maxY = Math.max(argPos1.y, argPos2.y);
+	let checkpos = btn.pos.x >= minX && btn.pos.x <= maxX && btn.pos.y >= minY && btn.pos.y <= maxY;
+	return (checkpos && mButtons[argButton].press);
+}
+var keys = new Object();
+var mButtons = new Object();
 window.addEventListener("keydown",(e)=>{
 	keys[e.code] = true;
 });
 window.addEventListener("keyup",(e)=>{
 	keys[e.code] = false;
 });
+window.addEventListener("mousedown",(e)=>{
+	mButtons[e.button].press = true;
+	mButtons[e.button].pos.x = e.offsetX;
+	mButtons[e.button].pos.y = e.offsetY;
+});
+window.addEventListener("mouseup",(e)=>{
+	mButtons[e.button].press = false;
+	mButtons[e.button].pos.x = e.offsetX;
+	mButtons[e.button].pos.y = e.offsetY;
+});
+mouseCheckPos(0,-1,-1);
+mouseCheckPos(1,-1,-1);
+mouseCheckPos(2,-1,-1);
 const leoEngineCSS = document.createElement("link");
 leoEngineCSS.href = "leoEngine.css";
 leoEngineCSS.rel = "stylesheet";
