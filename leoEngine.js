@@ -203,8 +203,7 @@ class RenderWindow {
 		}
 		title.innerText = argTitle;
 
-		canvas = this.canvas;
-		ctx = this.ctx;
+		showWindow(this);
 
 		this.setFramerateLimit(60);
 	}
@@ -273,12 +272,66 @@ function createWindow(argW,argH,argTitle="") {
 	let newWindow = new RenderWindow(argW,argH,argTitle);
 	return newWindow;
 }
+function showWindow(argWindow) {
+	//Registro global
+	canvas = argWindow.canvas;
+	ctx = argWindow.ctx;
+
+	//Registro de eventos de teclado
+	canvas.addEventListener("keydown",(e)=>{
+		keys[e.code] = true;
+	});
+	canvas.addEventListener("keyup",(e)=>{
+		keys[e.code] = false;
+	});
+
+	//Registro de eventos de mouse
+	canvas.addEventListener("mousedown",(e)=>{
+		mButtons[e.button].press = true;
+		mButtons[e.button].pos.x = e.offsetX;
+		mButtons[e.button].pos.y = e.offsetY;
+	});
+	canvas.addEventListener("mouseup",(e)=>{
+		mButtons[e.button].press = false;
+		mButtons[e.button].pos.x = e.offsetX;
+		mButtons[e.button].pos.y = e.offsetY;
+	});
+	canvas.addEventListener("mousemove",(e)=>{
+		m.x = e.offsetX;
+		m.y = e.offsetY;
+	})
+}
+
+//Funções de teclado
+var keys = new Object();
 function keyboardCheck(argKey) {
 	if (!(argKey in keys)) {
 		keys[argKey] = false;
 		console.log("KEY "+argKey);
 	}
 	return keys[argKey];
+}
+
+//Funções de mouse
+var mButtons = new Object();
+var m = new Vec2(-1,-1);
+const MB = {
+	LEFT: 0,
+	MIDDLE: 1,
+	RIGHT: 2
+};
+function mouseCheck(argButton) {
+	if (!(argButton in mButtons)) {
+		mButtons[argButton] = {
+			press: false,
+			pos: new Vec2(-1,-1)
+		};
+		console.log("MBUTTON "+argButton);
+	}
+	return mButtons[argButton].press;
+}
+function mouseGetPos() {
+	return m;
 }
 function mouseCheckPos(argButton,argPos1,argPos2) {
 	if (!(argButton in mButtons)) {
@@ -296,27 +349,11 @@ function mouseCheckPos(argButton,argPos1,argPos2) {
 	let checkpos = btn.pos.x >= minX && btn.pos.x <= maxX && btn.pos.y >= minY && btn.pos.y <= maxY;
 	return (checkpos && mButtons[argButton].press);
 }
-var keys = new Object();
-var mButtons = new Object();
-window.addEventListener("keydown",(e)=>{
-	keys[e.code] = true;
-});
-window.addEventListener("keyup",(e)=>{
-	keys[e.code] = false;
-});
-window.addEventListener("mousedown",(e)=>{
-	mButtons[e.button].press = true;
-	mButtons[e.button].pos.x = e.offsetX;
-	mButtons[e.button].pos.y = e.offsetY;
-});
-window.addEventListener("mouseup",(e)=>{
-	mButtons[e.button].press = false;
-	mButtons[e.button].pos.x = e.offsetX;
-	mButtons[e.button].pos.y = e.offsetY;
-});
 mouseCheckPos(0,-1,-1);
 mouseCheckPos(1,-1,-1);
 mouseCheckPos(2,-1,-1);
+
+//Preparo da HUD da LeoEngine
 const leoEngineCSS = document.createElement("link");
 leoEngineCSS.href = "leoEngine.css";
 leoEngineCSS.rel = "stylesheet";
