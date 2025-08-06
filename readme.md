@@ -33,6 +33,6 @@ SeuProjeto/
 ## Créditos
 
 Desenvolvido por Leandro Gabriel.  
-Inspirado em jogos clássicos e exemplos de engines simples em JavaScript.
+Inspirado na engine GameMaker, com o auxílio do desenvolvimento de [jogos clássicos em C++ por FamTrinli no YouTube](https://www.youtube.com/playlist?list=PLB_ibvUSN7mzUffhiay5g5GUHyJRO4DYr).
 
 ---
