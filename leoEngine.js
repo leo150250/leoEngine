@@ -343,10 +343,11 @@ class RenderWindow {
 }
 
 //Funções
-/**Draws a sprite image onto the canvas at the specified coordinates. 
- * @param {Sprite} argSprite - The sprite object containing image and source rectangle properties.
- * @param {int} argX - The x-coordinate on the canvas where the sprite will be drawn.
- * @param {int} argY - The y-coordinate on the canvas where the sprite will be drawn.
+/**
+ * Desenha uma sprite no canvas nas coordenadas especificadas.
+ * @param {Sprite} argSprite - Sprite a ser desenhada.
+ * @param {number} argX - Posição X na tela.
+ * @param {number} argY - Posição Y na tela.
  */
 function drawSprite(argSprite,argX,argY) {
 	ctx.drawImage(
@@ -382,7 +383,7 @@ function drawSpriteTiled(argSprite,argX,argY) {
 function drawSpriteExt(argSprite, argX, argY, argScaleX = 1, argScaleY = 1, argRot = 0, argBlend = C.WHITE, argAlpha = 1) {
     ctx.save();
     ctx.translate(argX, argY);
-    ctx.rotate(argRot);
+    ctx.rotate(argRot * -Math.PI / 180);
     ctx.scale(argScaleX, argScaleY);
     ctx.globalAlpha = argAlpha;
 
@@ -414,7 +415,7 @@ function drawSpriteExt(argSprite, argX, argY, argScaleX = 1, argScaleY = 1, argR
         ctx.drawImage(
             argSprite.img,
             argSprite.x, argSprite.y, argSprite.w, argSprite.h,
-            argSprite.x-argSprite.xOrigin, argSprite.y-argSprite.yOrigin, argSprite.w, argSprite.h
+            0-argSprite.xOrigin, 0-argSprite.yOrigin, argSprite.w, argSprite.h
         );
     }
 
