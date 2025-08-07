@@ -41,6 +41,17 @@ const PR = {
 	POINTLIST: "pointlist",
 	VERTEXMESH: "vertexmesh",
 }
+const VK = {
+	LEFT: "ArrowLeft",
+	RIGHT: "ArrowRight",
+	UP: "ArrowUp",
+	DOWN: "ArrowDown"
+}
+const MB = {
+	LEFT: 0,
+	MIDDLE: 1,
+	RIGHT: 2
+};
 //Classes
 class Loader {
 	constructor() {
@@ -87,15 +98,21 @@ class Resource {
 class IEvent {
 	constructor(argOwner) {
 		this.owner = argOwner;
+		this.owner.IEvents.push(this);
+		this.logic = function() {};
+	}
+	execute() {
+		this.logic.call(this.owner);
 	}
 }
 class Alarm extends IEvent {
 	constructor(argOwner) {
 		super(argOwner);
-		this.logic = function() {};
 	}
-	execute() {
-		this.logic.call(this.owner);
+}
+class MouseClick extends IEvent {
+	constructor(argOwner) {
+		super(argOwner);
 	}
 }
 
@@ -241,8 +258,10 @@ class Instance extends Resource {
 		this.imageAngle = 0;
 		this.imageBlend = C.WHITE;
 		this.imageAlpha = 1;
+		this.IEvents = [];
 		this.alarm = Array.from({length:12}, () => -1);
-		this.alarmFunc = Array.from({length:12}, () => new Alarm(this));
+		this._alarmFunc = Array.from({length:12}, () => new Alarm(this));
+		this._mouseB = Array.from({length: 3}, () => new MouseClick(this));
 		this.visible = true;
 
 		console.log("INST "+instances.length);
@@ -254,8 +273,12 @@ class Instance extends Resource {
 	get y() { return this.pos.y; }
 	set y(value) { this.pos.y = value; }
 	
-	setAlarm(argAlarm,argFunction) {
-		this.alarmFunc[argAlarm].logic = argFunction;
+	setAlarm(argAlarm,argFunction = function() {}) {
+		this._alarmFunc[argAlarm].logic = argFunction;
+	}
+
+	setMouseButton(argMouseButton,argFunction = function() {}) {
+		this._mouseB[argMouseButton].logic = argFunction;
 	}
 
 	logic() {
@@ -264,11 +287,18 @@ class Instance extends Resource {
 	innerLogic() {
 		this.x += this.hspeed;
 		this.y += this.vspeed;
+
+		for (let i = 0; i < 3; i++) {
+			if (mouseCheckPos(i,new Vec2(this.x - this.sprite.xOrigin,this.y - this.sprite.yOrigin),new Vec2(this.x - this.sprite.xOrigin + this.sprite.width, this.y - this.sprite.yOrigin + this.sprite.height))) {
+				this._mouseB[i].execute();
+			}
+		}
+
 		for (let i = 0; i < 12; i++) {
 			this.alarm[i]--;
 			if (this.alarm[i] == 0) {
 				//console.log("Chamando alarm "+i);
-				this.alarmFunc[i].execute();
+				this._alarmFunc[i].execute();
 			}
 		}
 	}
@@ -308,8 +338,19 @@ class RenderWindow {
 
 		this.setFramerateLimit(60);
 	}
+	preInnerLogic() {
+		//Nada ainda!
+	}
 	logic() {
 		//Atualizar posteriormente;
+	}
+	innerLogic() {
+		//Nada ainda!
+	}
+	postInnerLogic() {
+		//Reseta o delta mouse
+		md.x = 0;
+		md.y = 0;
 	}
 	draw() {
 		//Atualizar posteriormente;
@@ -318,6 +359,7 @@ class RenderWindow {
 		this.update = setInterval(()=>{
 			if (loader.check()) {
 				try {
+					this.preInnerLogic();
 					for (let instance of instances) {
 						instance.logic();
 						instance.innerLogic();
@@ -332,6 +374,7 @@ class RenderWindow {
 							instance.draw();
 						}
 					}
+					this.postInnerLogic();
 				} catch (error) {
 					clearInterval(this.update);
 					showError(error);
@@ -610,7 +653,12 @@ function showWindow(argWindow) {
 	canvas.addEventListener("mousemove",(e)=>{
 		m.x = e.offsetX;
 		m.y = e.offsetY;
-	})
+		md.x = e.movementX;
+		md.y = e.movementY;
+	});
+	canvas.addEventListener("mouseleave",(e)=>{
+		mButtons[e.button].press = false;
+	});
 }
 /**
  * Exibe o diálogo de erro.
@@ -629,15 +677,19 @@ function showError(argError) {
 	document.body.appendChild(dialogError);
 	dialogError.showModal();
 }
+window.addEventListener("error",(e)=>{
+	showError(e);
+});
 
-//Funções de teclado
+
+
+
+
+
+//#region Input
+
+//#region Teclado
 var keys = new Object();
-const VK = {
-	LEFT: "ArrowLeft",
-	RIGHT: "ArrowRight",
-	UP: "ArrowUp",
-	DOWN: "ArrowDown"
-}
 function keyboardCheck(argKey) {
 	if (!(argKey in keys)) {
 		keys[argKey] = false;
@@ -645,22 +697,18 @@ function keyboardCheck(argKey) {
 	}
 	return keys[argKey];
 }
-//Registro de eventos de teclado
+//Registro de eventos de teclado na página
 window.addEventListener("keydown",(e)=>{
 	keys[e.code] = true;
 });
 window.addEventListener("keyup",(e)=>{
 	keys[e.code] = false;
 });
-
-//Funções de mouse
+//#endregion
+//#region Mouse
 var mButtons = new Object();
 var m = new Vec2(-1,-1);
-const MB = {
-	LEFT: 0,
-	MIDDLE: 1,
-	RIGHT: 2
-};
+var md = new Vec2(0,0);
 function mouseCheck(argButton) {
 	if (!(argButton in mButtons)) {
 		mButtons[argButton] = {
@@ -690,9 +738,13 @@ function mouseCheckPos(argButton,argPos1,argPos2) {
 	let checkpos = btn.pos.x >= minX && btn.pos.x <= maxX && btn.pos.y >= minY && btn.pos.y <= maxY;
 	return (checkpos && mButtons[argButton].press);
 }
+//Registro prévio de botões do mouse
 mouseCheckPos(0,-1,-1);
 mouseCheckPos(1,-1,-1);
 mouseCheckPos(2,-1,-1);
+//#endregion
+
+//#endregion
 
 //Preparo da HUD da LeoEngine
 const leoEngineCSS = document.createElement("link");
