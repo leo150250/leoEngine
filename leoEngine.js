@@ -100,6 +100,7 @@ class IEvent {
 		this.owner = argOwner;
 		this.owner.IEvents.push(this);
 		this.logic = function() {};
+		this.state = false;
 	}
 	execute() {
 		this.logic.call(this.owner);
@@ -110,9 +111,43 @@ class Alarm extends IEvent {
 		super(argOwner);
 	}
 }
-class MouseClick extends IEvent {
-	constructor(argOwner) {
+class MouseButton extends IEvent {
+	constructor(argOwner,argMouseButton) {
 		super(argOwner);
+		this.mb = argMouseButton;
+	}
+	execute() {
+		if (mButtons[this.mb].press) {
+			this.logic.call(this.owner);
+		}
+	}
+}
+class MousePressed extends IEvent {
+	constructor(argOwner,argMouseButton) {
+		super(argOwner);
+		this.mb = argMouseButton;
+	}
+	execute() {
+		if (this.state && mButtons[this.mb].press) {
+			this.state = false;
+			this.logic.call(this.owner);
+		} else if (!this.state && !mButtons[this.mb].press) {
+			this.state = true;
+		}
+	}
+}
+class MouseReleased extends IEvent {
+	constructor(argOwner,argMouseButton) {
+		super(argOwner);
+		this.mb = argMouseButton;
+	}
+	execute() {
+		if (this.state && !mButtons[this.mb].press) {
+			this.state = false;
+			this.logic.call(this.owner);
+		} else if (!this.state && mButtons[this.mb].press) {
+			this.state = true;
+		}
 	}
 }
 
@@ -155,13 +190,14 @@ class Texture extends Resource {
 }
 var sprites = [];
 class Sprite extends Resource {
-	constructor(argImg,argPos=new Vec2(),argW=-1,argH=-1) {
+	constructor(argImg,argPos = new Vec2(),argW = -1,argH = -1,argImageNumber = 1) {
 		super();
 
 		this.tex = null;
 		this.pos = argPos;
 		this.w = argW;
 		this.h = argH;
+		this.imageNumber = argImageNumber;
 		this.xOrigin = 0;
 		this.yOrigin = 0;
 		this._vxOrigin = AL.LEFT;
@@ -258,10 +294,13 @@ class Instance extends Resource {
 		this.imageAngle = 0;
 		this.imageBlend = C.WHITE;
 		this.imageAlpha = 1;
+		this.imageIndex = 0;
 		this.IEvents = [];
 		this.alarm = Array.from({length:12}, () => -1);
 		this._alarmFunc = Array.from({length:12}, () => new Alarm(this));
-		this._mouseB = Array.from({length: 3}, () => new MouseClick(this));
+		this._mouseB = Array.from({length: 3}, (v,k) => new MouseButton(this,k));
+		this._mouseBPressed = Array.from({length: 3}, (v,k) => new MousePressed(this,k));
+		this._mouseBReleased = Array.from({length: 3}, (v,k) => new MouseReleased(this,k));
 		this.visible = true;
 
 		console.log("INST "+instances.length);
@@ -280,6 +319,12 @@ class Instance extends Resource {
 	setMouseButton(argMouseButton,argFunction = function() {}) {
 		this._mouseB[argMouseButton].logic = argFunction;
 	}
+	setMousePressed(argMouseButton,argFunction = function() {}) {
+		this._mouseBPressed[argMouseButton].logic = argFunction;
+	}
+	setMouseReleased(argMouseButton,argFunction = function() {}) {
+		this._mouseBReleased[argMouseButton].logic = argFunction;
+	}
 
 	logic() {
 		//Lógica adicionada posteriormente dinamicamente.
@@ -288,9 +333,20 @@ class Instance extends Resource {
 		this.x += this.hspeed;
 		this.y += this.vspeed;
 
-		for (let i = 0; i < 3; i++) {
-			if (mouseCheckPos(i,new Vec2(this.x - this.sprite.xOrigin,this.y - this.sprite.yOrigin),new Vec2(this.x - this.sprite.xOrigin + this.sprite.width, this.y - this.sprite.yOrigin + this.sprite.height))) {
+		if (mouseHover(new Vec2(this.x - this.sprite.xOrigin,this.y - this.sprite.yOrigin),new Vec2(this.x - this.sprite.xOrigin + this.sprite.width, this.y - this.sprite.yOrigin + this.sprite.height))) {
+			for (let i = 0; i < 3; i++) {
+				this._mouseBPressed[i].execute();
 				this._mouseB[i].execute();
+				this._mouseBReleased[i].execute();
+			}
+		} else {
+			for (let i = 0; i < 3; i++) {
+				if (this._mouseBPressed[i].state) {
+					this._mouseBPressed[i].state = false;
+				}
+				if (this._mouseBReleased[i].state) {
+					this._mouseBReleased[i].state = false;
+				}
 			}
 		}
 
@@ -305,7 +361,7 @@ class Instance extends Resource {
 	draw() {
 		//drawSprite(this.sprite,this.x,this.y);
 		drawSpriteExt(
-			this.sprite,
+			this.sprite, this.imageIndex,
 			this.x, this.y,
 			this.imageXScale, this.imageYScale,
 			this.imageAngle, this.imageBlend, this.imageAlpha); // Função padrão de draw, para a instância desenhar a própria imagem com suas variáveis reservadas
@@ -396,21 +452,23 @@ class RenderWindow {
  * @param {number} argX - Posição X na tela.
  * @param {number} argY - Posição Y na tela.
  */
-function drawSprite(argSprite,argX,argY) {
+function drawSprite(argSprite,argSubimage,argX,argY) {
+	let subimage = (argSubimage % argSprite.imageNumber) * argSprite.w;
 	ctx.drawImage(
 		argSprite.img,
-		argSprite.x, argSprite.y, argSprite.w, argSprite.h,
+		argSprite.x + subimage, argSprite.y, argSprite.w, argSprite.h,
 		argX - argSprite.xOrigin, argY - argSprite.yOrigin, argSprite.w, argSprite.h
 	);
 };
-function drawSpriteTiled(argSprite,argX,argY) {
+function drawSpriteTiled(argSprite,argSubimage,argX,argY) {
 	let x = argX - argSprite.xOrigin;
 	let y = argY - argSprite.yOrigin;
+	let subimage = (argSubimage % argSprite.imageNumber) * argSprite.w;
 	for (let i = 0; i < canvas.width; i += argSprite.w) {
 		for (let j = 0; j < canvas.height; j += argSprite.h) {
 			ctx.drawImage(
 				argSprite.img,
-				argSprite.x, argSprite.y, argSprite.w, argSprite.h,
+				argSprite.x + subimage, argSprite.y, argSprite.w, argSprite.h,
 				i + x, j + y, argSprite.w, argSprite.h
 			);
 		}
@@ -427,13 +485,13 @@ function drawSpriteTiled(argSprite,argX,argY) {
  * @param {string} argBlend - Cor de blend (hex).
  * @param {number} argAlpha - Transparência (0-1).
  */
-function drawSpriteExt(argSprite, argX, argY, argScaleX = 1, argScaleY = 1, argRot = 0, argBlend = C.WHITE, argAlpha = 1) {
+function drawSpriteExt(argSprite, argSubimage, argX, argY, argScaleX = 1, argScaleY = 1, argRot = 0, argBlend = C.WHITE, argAlpha = 1) {
     ctx.save();
     ctx.translate(argX, argY);
     ctx.rotate(argRot * -Math.PI / 180);
     ctx.scale(argScaleX, argScaleY);
     ctx.globalAlpha = argAlpha;
-
+	let subimage = (argSubimage % argSprite.imageNumber) * argSprite.w;
     if (argBlend && argBlend !== C.WHITE) {
         // Canvas auxiliar
         let tempCanvas = document.createElement("canvas");
@@ -461,7 +519,7 @@ function drawSpriteExt(argSprite, argX, argY, argScaleX = 1, argScaleY = 1, argR
     } else {
         ctx.drawImage(
             argSprite.img,
-            argSprite.x, argSprite.y, argSprite.w, argSprite.h,
+            argSprite.x + subimage, argSprite.y, argSprite.w, argSprite.h,
             0-argSprite.xOrigin, 0-argSprite.yOrigin, argSprite.w, argSprite.h
         );
     }
@@ -655,8 +713,8 @@ function showWindow(argWindow) {
 		mButtons[e.button].pos.y = e.offsetY;
 	});
 	canvas.addEventListener("mousemove",(e)=>{
-		m.x = e.offsetX;
-		m.y = e.offsetY;
+		_m.x = e.offsetX;
+		_m.y = e.offsetY;
 		md.x = e.movementX;
 		md.y = e.movementY;
 	});
@@ -711,7 +769,7 @@ window.addEventListener("keyup",(e)=>{
 //#endregion
 //#region Mouse
 var mButtons = new Object();
-var m = new Vec2(-1,-1);
+var _m = new Vec2(-1,-1);
 var md = new Vec2(0,0);
 function mouseCheck(argButton) {
 	if (!(argButton in mButtons)) {
@@ -724,7 +782,7 @@ function mouseCheck(argButton) {
 	return mButtons[argButton].press;
 }
 function mouseGetPos() {
-	return m;
+	return _m;
 }
 function mouseCheckPos(argButton,argPos1,argPos2) {
 	if (!(argButton in mButtons)) {
@@ -742,10 +800,18 @@ function mouseCheckPos(argButton,argPos1,argPos2) {
 	let checkpos = btn.pos.x >= minX && btn.pos.x <= maxX && btn.pos.y >= minY && btn.pos.y <= maxY;
 	return (checkpos && mButtons[argButton].press);
 }
+function mouseHover(argPos1,argPos2) {
+	let minX = Math.min(argPos1.x, argPos2.x);
+	let maxX = Math.max(argPos1.x, argPos2.x);
+	let minY = Math.min(argPos1.y, argPos2.y);
+	let maxY = Math.max(argPos1.y, argPos2.y);
+	let checkpos = _m.x >= minX && _m.x <= maxX && _m.y >= minY && _m.y <= maxY;
+	return checkpos;
+}
 //Registro prévio de botões do mouse
-mouseCheckPos(0,-1,-1);
-mouseCheckPos(1,-1,-1);
-mouseCheckPos(2,-1,-1);
+mouseCheck(0);
+mouseCheck(1);
+mouseCheck(2);
 //#endregion
 
 //#endregion
