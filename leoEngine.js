@@ -341,6 +341,9 @@ class RenderWindow {
 	preInnerLogic() {
 		//Nada ainda!
 	}
+	preLogic() {
+		//Atualizar posteriormente;
+	}
 	logic() {
 		//Atualizar posteriormente;
 	}
@@ -360,6 +363,7 @@ class RenderWindow {
 			if (loader.check()) {
 				try {
 					this.preInnerLogic();
+					this.preLogic();
 					for (let instance of instances) {
 						instance.logic();
 						instance.innerLogic();
